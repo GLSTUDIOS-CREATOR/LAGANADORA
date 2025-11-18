@@ -5,3 +5,5 @@ lxml
 qrcode
 reportlab
 PyPDF2
+requests
+flask_sqlalchemy
