@@ -18,6 +18,7 @@ from flask import (
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.utils import ImageReader
+from reportlab.lib.units import mm
 from reportlab.platypus import Table, TableStyle
 from reportlab.lib import colors
 from PyPDF2 import PdfMerger
@@ -424,135 +425,46 @@ def ultimos_movimientos():
     m = cargar_movimientos(); m.reverse()
     return render_template('ultimos_movimientos.html', movimientos=m)
 
-# ─── SORTEOS (CRUD con SQLAlchemy) ───────────────────────────
 
-@app.route('/sorteos', methods=['GET','POST'])
+
+@app.route('/sorteos')
 @requiere_rol('superadmin','admin')
 def vista_sorteos():
-    if request.method=='POST':
-        f=request.form
-        s=Sorteo(
-            codigo=f['codigo'],
-            nombre=f['nombre'],
-            fecha_evento=datetime.strptime(f['fecha_evento'],'%Y-%m-%d').date(),
-            premio_gordo=Decimal(f['premio_gordo']),
-            plantilla=f.get('plantilla')
-        )
-        db.session.add(s)
-        db.session.commit()
-        flash('Sorteo creado','success')
-        return redirect(url_for('vista_sorteos'))
-
     sorteos = Sorteo.query.order_by(Sorteo.fecha_evento.desc()).all()
     return render_template('sorteos.html', sorteos=sorteos)
 
 
-@app.route('/activar_sorteo/<int:sorteo_id>', methods=['POST'])
-@requiere_rol('superadmin', 'admin')
-def activar_sorteo(sorteo_id):
-    # Desactivar todos los sorteos
-    Sorteo.query.update({Sorteo.activo: False})
-    # Activar el seleccionado
-    s = Sorteo.query.get_or_404(sorteo_id)
-    s.activo = True
-    db.session.commit()
-
-    flash('Sorteo activado', 'success')
-    return redirect(url_for('vista_sorteos'))
 
 
 
-from decimal import Decimal
-from models import Sorteo, Vendedor  # si no lo tenías ya importado
-
-#CREAR SORTEO REVISAR EL CODIGO #
-
-@app.route('/crear_dia_sorteo')
-@login_required
-def crear_dia_sorteo():
-    return render_template('crear_dia_sorteo.html')
-
-
-
-
-@app.route('/sorteos/nuevo', methods=['GET', 'POST'])
-@requiere_rol('superadmin','admin')
-def nuevo_sorteo():
-    if request.method == 'POST':
-        # 1) Recoger datos
-        codigo      = request.form['codigo'].strip()
-        nombre      = request.form['nombre'].strip()
-        fecha_str   = request.form['fecha_evento']
-        premio_str  = request.form['premio_gordo']
-        plantilla   = request.form.get('plantilla','').strip() or None
-
-        # 2) Convertirlos
-        fecha_evento = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-        premio_gordo = Decimal(premio_str)
-
-        # 3) Persistir en la BD
-        s = Sorteo(
-            codigo=codigo,
-            nombre=nombre,
-            fecha_evento=fecha_evento,
-            premio_gordo=premio_gordo,
-            plantilla=plantilla
-        )
-        db.session.add(s)
-        db.session.commit()
-
-        flash('Sorteo creado correctamente','success')
-        return redirect(url_for('vista_sorteos'))
-
-    # GET → renderiza el formulario
-    vendedores = Vendedor.query.order_by(Vendedor.nombre).all()
-    return render_template('nuevo_sorteo.html',
-                           vendedores=vendedores,
-                           usuario=session['usuario'],
-                           rol=session['rol'],
-                           avatar=session['avatar'],
-                           permisos=session['permisos'])
-
-
-from flask import abort
-
-# ─── EDITAR SORTEO ────────────────────────────────────────────
-@app.route('/sorteos/editar/<int:sorteo_id>', methods=['GET','POST'])
-@requiere_rol('superadmin','admin')
-def editar_sorteo(sorteo_id):
-    s = Sorteo.query.get_or_404(sorteo_id)
-
-    if request.method == 'POST':
-        s.codigo       = request.form['codigo'].strip()
-        s.nombre       = request.form['nombre'].strip()
-        s.fecha_evento = datetime.strptime(request.form['fecha_evento'], '%Y-%m-%d').date()
-        s.premio_gordo = Decimal(request.form['premio_gordo'])
-        s.plantilla    = request.form.get('plantilla','').strip() or None
-
-        db.session.commit()
-        flash('Sorteo actualizado','success')
-        return redirect(url_for('vista_sorteos'))
-
-    # GET: muestro form con datos cargados
-    return render_template('editar_sorteo.html', sorteo=s,
-                           usuario=session['usuario'],
-                           rol=session['rol'],
-                           avatar=session['avatar'],
-                           permisos=session['permisos'])
-
-
-# ─── ELIMINAR SORTEO ─────────────────────────────────────────
-@app.route('/sorteos/eliminar/<int:sorteo_id>', methods=['POST'])
-@requiere_rol('superadmin','admin')
-def eliminar_sorteo(sorteo_id):
-    s = Sorteo.query.get_or_404(sorteo_id)
-    db.session.delete(s)
-    db.session.commit()
-    flash('Sorteo eliminado','warning')
-    return redirect(url_for('vista_sorteos'))
-
-
-
+# ─── (DESACTIVADO) CREAR SORTEO ───────────────────────────────────────────────
+# @app.route('/sorteos/nuevo', methods=['GET', 'POST'])
+# @requiere_rol('superadmin', 'admin')
+# def nuevo_sorteo():
+#     if request.method == 'POST':
+#         try:
+#             codigo     = request.form['codigo'].strip()
+#             nombre     = request.form['nombre'].strip()
+#             fecha_str  = request.form['fecha_evento']
+#             premio_str = request.form['premio_gordo']
+#             fecha_evento = datetime.strptime(fecha_str, '%Y-%m-%d').date()
+#             premio_gordo = Decimal(premio_str)
+#             s = Sorteo(
+#                 codigo=codigo,
+#                 nombre=nombre,
+#                 fecha_evento=fecha_evento,
+#                 premio_gordo=premio_gordo
+#             )
+#             db.session.add(s)
+#             db.session.commit()
+#             flash('Sorteo creado correctamente', 'success')
+#             return redirect(url_for('vista_sorteos'))
+#         except Exception as e:
+#             db.session.rollback()
+#             flash(f'Error al crear sorteo: {e}', 'danger')
+#             return redirect(url_for('vista_sorteos'))
+#
+#     # GET → render_template('nuevo_sorteo.html', …)
 
 
 
@@ -586,279 +498,320 @@ def juego():
         permisos=session['permisos']
     )
 # ─── REDIRECCIÓN + IMPRESIÓN ─────────────────────────────────
+# ── ZONA IMPRESIONABLE ──────────────────────────────────────
+BLEED    = 5 * mm           # Margen muerto de la impresora (ajusta según tu modelo)
+w, h     = A4
+usable_w = w - 0.9 * BLEED    # Ancho efectivo
+usable_h = h - 0.9 * BLEED    # Alto efectivo
+# ────────────────────────────────────────────────────────────
+# ── CALIBRACIÓN GLOBAL ─────────────────────────────────────────
+# Ajusta estos valores hasta que tu rejilla quede centrada en el boleto
+OFFSET_X = -20    # negativo → mueve todo a la derecha; positivo → a la izquierda
+OFFSET_Y = 5   # negativo → mueve todo hacia arriba;   positivo → hacia abajo
+# Ajusta CALIB_Y hasta que la primera fila ya no se corte
+# ───────────────────────────────────────────────────────────
 
-# ── RUTAS y CONSTANTES ──
-BASE_DIR       = os.path.dirname(__file__)
-DATA_DIR       = os.path.join(BASE_DIR, "data")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.path.join(BASE_DIR, "data")
 REINTEGROS_DIR = os.path.join(DATA_DIR, "REINTEGROS")
-os.makedirs(DATA_DIR, exist_ok=True)
-os.makedirs(REINTEGROS_DIR, exist_ok=True)
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
+# ── CALIBRACIÓN GLOBAL ────────────────────────────────────────────
+# Ajusta estos valores (pt) hasta que tu PDF cuadre con la impresora:
+CALIB_X =  12    # positivo → desplaza todo hacia la derecha
+CALIB_Y = -22    # negativo → desplaza todo hacia arriba
 
-MARGEN_IZQ     = 20
-MARGEN_SUP     = 60
-ESPACIO_X      = 60
-ESPACIO_Y      = 85
-COLUMNAS       = 2
-FILAS          = 4
 
-SIZE_NUM       = 20
-SIZE_INFO      = 10
-SIZE_VALOR     = 15
-REINTEGRO_W    = 41
-REINTEGRO_H    = 41
+# ── CONSTANTES DE DISEÑO ─────────────────────────────────────────
+COLUMNAS      = 2      # boletos por fila
+FILAS         = 4      # filas de boletos por página
+MARGEN_H      = 14     # margen general (izq/dcha hoja)
+ESPACIO_H     = 35     # espacio horizontal entre celdas
+ESPACIO_V     = 35     # espacio vertical entre celdas
 
-DELTA_Y_FILA_3 = 2
-DELTA_Y_FILA_4 = 5
+GRID_SCALE    = 1    # compacidad del bloque 5×5 (0.0–1.0)
+CELL_ROT      = -90    # rotación de la rejilla de números
+GRID_OFFSET_X = +60    # desplazamiento horizontal global de la rejilla
+GRID_OFFSET_Y = -10    # desplazamiento vertical global de la rejilla
 
-SERIE_MAP = {
-    "Srs_ib1.xlsx":   "V",
-    "Srs_ib2.xlsx":   "+",
-    "Srs_ib3.xlsx":   "&",
-    "Srs_Manila.xlsx":"M"
-}
+SIZE_NUM      = 23     # tamaño fuente de los números de la rejilla
+SIZE_ID       = 12     # tamaño fuente del ID del boleto (destacado)
+INFO_FSIZE    = 8     # tamaño de fuente de la línea de info
+SIZE_INFO     = INFO_FSIZE
+INFO_ROT      = -90    # rotación de la línea de info
+INFO_DX       = -140   # desplazamiento X global de la info
+INFO_DY       = +80    # desplazamiento Y global de la info
 
-# ── OFFSETS EN CÓDIGO (boleto 0…7) ──
-# Ajusta aquí X/Y para grid, info y reintegro de cada boleto:
+REINT_W       = 45     # ancho del icono de reintegro
+REINT_H       = 45     # alto del icono de reintegro
+REINT_ROT     = -90    # rotación del icono de reintegro
+REINT_DX      = -REINT_W + 170  # desplazamiento X global del reintegro
+REINT_DY      = +140            # desplazamiento Y global del reintegro
+
+# ── Offsets específicos por boleto (0-based) ──
 per_cell_offsets = {
-    0: {"grid_x": -20,   "grid_y": 36,   "info_x": 100,   "info_y": 50,   "rein_x": 40,   "rein_y": 20},
-    1: {"grid_x": -55,   "grid_y": 36,   "info_x": 60,   "info_y": 50,   "rein_x":  -5,   "rein_y": 20},
-    2: {"grid_x": -20,   "grid_y": 90,   "info_x": 100,   "info_y": 100,   "rein_x": 40,   "rein_y": -20},
-    3: {"grid_x": -55,   "grid_y": 90,   "info_x": 60,   "info_y": 100,   "rein_x":  -5,   "rein_y": -30},
-    4: {"grid_x": -20,   "grid_y": 140,   "info_x": 100,   "info_y": 150,   "rein_x": 40,   "rein_y": -80},
-    5: {"grid_x": -55,   "grid_y": 140,   "info_x": 60,   "info_y": 150,   "rein_x":  -5,   "rein_y": -80},
-    6: {"grid_x": -20,   "grid_y": 185,   "info_x": 100,   "info_y": 200,   "rein_x": 40,   "rein_y": -130},
-    7: {"grid_x": -60,   "grid_y": 185,   "info_x": 60,   "info_y": 200,   "rein_x":  -5,   "rein_y": -130},
+    0: {"grid_x": -100, "grid_y": -68, "info_x": 120, "info_y": 120, "rein_x": 85, "rein_y":  -265},
+    1: {"grid_x": -100, "grid_y": -60, "info_x": 130, "info_y": 110,"rein_x": 85,  "rein_y": -265},
+    2: {"grid_x": -100, "grid_y": -68, "info_x": 120, "info_y": 120, "rein_x": 85, "rein_y":  -265},
+    3: {"grid_x": -100, "grid_y": -60, "info_x": 130, "info_y": 110, "rein_x": 85, "rein_y":  -265},
+    4: {"grid_x": -100, "grid_y": -68, "info_x": 120, "info_y": 120, "rein_x": 85, "rein_y":  -265},
+    5: {"grid_x": -100, "grid_y": -60, "info_x": 130, "info_y": 110, "rein_x": 85, "rein_y":  -265},
+    6: {"grid_x": -100, "grid_y": -68, "info_x": 120, "info_y": 120, "rein_x": 85, "rein_y":  -265},
+    7: {"grid_x": -100, "grid_y": -60, "info_x": 130, "info_y": 110, "rein_x": 85, "rein_y":  -265},
 }
 
 
-@app.route('/impresion', methods=['GET', 'POST'], endpoint='impresion')
-@login_required
+# ── MAPEADO DE SERIES ──
+SERIE_MAP = {
+    "Srs_ib1.xlsx": "V",
+    "Srs_ib2.xlsx": "+",
+    "Srs_ib3.xlsx": "&",
+    "Srs_Manila.xlsx": "M"
+}
+
+@app.route('/impresion', methods=['GET', 'POST'])
 def impresion():
-    # ── Listado de series y reintegros disponibles ──
-    files      = sorted(f for f in os.listdir(DATA_DIR) if f.lower().endswith(('.xlsx')))
-    series     = [(f, SERIE_MAP.get(f, f)) for f in files]
+    files = sorted(f for f in os.listdir(DATA_DIR) if f.lower().endswith('.xlsx'))
+    series = [(f, SERIE_MAP.get(f, f)) for f in files]
+
     reintegros = sorted(f for f in os.listdir(REINTEGROS_DIR) if f.lower().endswith('.png'))
-    fecha_hoy  = date.today().strftime('%Y-%m-%d')
+    fecha_hoy = date.today().strftime('%Y-%m-%d')
 
     if request.method == 'POST':
         form_type = request.form.get('form_type')
 
-        # ── BOLETOS ─────────────────────────────────────────────
-        if form_type == 'boletos':
-            # Parámetros del formulario
-            serie_archivo = request.form['serie_archivo']
-            start         = request.form.get('serie_inicio', '')
-            end           = request.form.get('serie_fin', '')
-            valor         = request.form['valor']
-            telefono      = request.form['telefono']
-            fecha_str     = request.form.get('fecha_sorteo', fecha_hoy)
-            rein_esp      = request.form.get('reintegro_especial', '')
-            cntesp        = int(request.form.get('cant_reintegro_especial', 0))
-            incA          = (request.form.get('incluir_aleatorio', '1') == '1')
+        if form_type == "boletos":
+            nombre = request.form['serie_archivo']
+            start = request.form.get('serie_inicio', '')
+            end = request.form.get('serie_fin', '')
+            valor = request.form['valor']
+            telefono = request.form['telefono']
+            fecha_sorteo = request.form.get('fecha_sorteo', fecha_hoy)
+            reintegro_especial = request.form.get('reintegro_especial', '')
+            cant_reintegro_especial = int(request.form.get('cant_reintegro_especial', 0))
+            incluir_aleatorio = (request.form.get('incluir_aleatorio', '1') == '1')
 
-            # Cargo DataFrame y la lista completa de IDs
-            path = os.path.join(DATA_DIR, serie_archivo)
-            if serie_archivo.lower().endswith('.csv'):
+            path = os.path.join(DATA_DIR, nombre)
+            df = pd.read_excel(path, dtype=str).fillna('')
+            ids = df[df.columns[0]].astype(str).tolist()
+            if start and start in ids:
+                ids = ids[ids.index(start):]
+            if end and end in ids:
+                ids = ids[:ids.index(end) + 1]
+            boletos = df[df[df.columns[0]].astype(str).isin(ids)]
+
+            pdf_buf = generar_pdf_boletos_excel(
+                ids, boletos, valor, telefono, nombre,
+                reintegro_especial, cant_reintegro_especial,
+                reintegros, incluir_aleatorio, fecha_sorteo
+            )
+
+            sorteos = cargar_sorteos()
+            activo = next((s for s in sorteos if s['estado'] == 'Activo'), None)
+            if activo:
+                activo['boletos_impresos'] = {
+                    "serie": nombre,
+                    "inicio": ids[0],
+                    "fin": ids[-1],
+                    "cantidad": len(ids),
+                    "fecha": fecha_sorteo
+                }
+                guardar_sorteos(sorteos)
+
+            return send_file(pdf_buf, download_name='boletos_bingo.pdf', as_attachment=True)
+
+        elif form_type == "planilla":
+            archivo = request.form['serie_archivo_planilla']
+            inicio = int(request.form['planilla_inicio'])
+            fin = int(request.form['planilla_fin'])
+            fecha_planilla = request.form['fecha_planilla']
+
+            path = os.path.join(DATA_DIR, archivo)
+            if not os.path.exists(path):
+                raise FileNotFoundError(f"El archivo {path} no existe. Verifica tus archivos.")
+
+            if archivo.lower().endswith('.csv'):
                 df = pd.read_csv(path, dtype=str).fillna('')
             else:
                 df = pd.read_excel(path, dtype=str).fillna('')
 
-            all_ids = df[df.columns[0]].astype(str).tolist()
+            ids = df[df.columns[0]].astype(str).tolist()[inicio-1:fin]
 
-            # índices de slice según rango
-            try:
-                s_idx = all_ids.index(start) if start else 0
-            except ValueError:
-                flash(f'Boleto inicial “{start}” no existe.', 'danger')
-                return redirect(url_for('impresion'))
-            try:
-                e_idx = all_ids.index(end) + 1 if end else len(all_ids)
-            except ValueError:
-                flash(f'Boleto final “{end}” no existe.', 'danger')
-                return redirect(url_for('impresion'))
-
-            # construyo mi subconjunto
-            ids       = all_ids[s_idx:e_idx]
-            registros = df[df[df.columns[0]].astype(str).isin(ids)].to_dict('records')
-
-            # Registro en DailyOrder (igual que antes)
-            dt = datetime.strptime(fecha_str, '%Y-%m-%d').date()
-            sorteo = Sorteo.query.filter_by(fecha_evento=dt).first()
-            if not sorteo:
-                flash(f'No existe un sorteo para {fecha_str}', 'danger')
-                return redirect(url_for('impresion'))
-
-            order = DailyOrder.query.filter_by(sorteo_id=sorteo.id, date=dt).first()
-            if not order:
-                order = DailyOrder(
-                    sorteo_id    = sorteo.id,
-                    date         = dt,
-                    first_ticket = ids[0],
-                    last_ticket  = ids[-1],
-                    impresos     = len(ids),
-                    vendidos     = 0,
-                    devoluciones = 0
-                )
-                db.session.add(order)
-            else:
-                # expando rango si es necesario
-                if ids[0] < order.first_ticket:
-                    order.first_ticket = ids[0]
-                if ids[-1] > order.last_ticket:
-                    order.last_ticket  = ids[-1]
-                order.impresos += len(ids)
-            db.session.commit()
-
-            # Generar y enviar PDF de boletos (ahora usa 'ids' para la numeración real)
-            buf_b = generar_pdf_boletos_excel(
-                ids, registros, valor, telefono,
-                serie_archivo, rein_esp, cntesp,
-                reintegros, incA, fecha_str
-            )
-            return send_file(buf_b,
-                             download_name='boletos_bingo.pdf',
-                             as_attachment=True)
-
-        # ── PLANILLA ───────────────────────────────────────────
-        elif form_type == 'planilla':
-            archivo = request.form['serie_archivo_planilla']
-            inicio  = int(request.form['planilla_inicio'])
-            fin     = int(request.form['planilla_fin'])
-            fecha_p = request.form.get('fecha_planilla', fecha_hoy)
-
-            # 1) Cargo y recorto IDs
-            path = os.path.join(DATA_DIR, archivo)
-            if archivo.lower().endswith('.csv'):
-                df2 = pd.read_csv(path, dtype=str).fillna('')
-            else:
-                df2 = pd.read_excel(path, dtype=str).fillna('')
-            all_ids = df2[df2.columns[0]].astype(str).tolist()
-            ids_p   = all_ids[inicio-1:fin]
-
-            # 2) Genero un PDF por cada bloque de 40 y los uno
-            from PyPDF2 import PdfMerger
+            BOLETOS_X_PLANILLA = 40
             merger = PdfMerger()
-            chunk_size = 40
-            total = len(ids_p)
-            for offset in range(0, total, chunk_size):
-                sub_ids     = ids_p[offset:offset+chunk_size]
-                page_start  = inicio + offset
-                page_end    = min(page_start + len(sub_ids) - 1, fin)
+            for i in range(0, len(ids), BOLETOS_X_PLANILLA):
+                bloque_ids = ids[i:i + BOLETOS_X_PLANILLA]
+                bloque_ini = inicio + i
+                bloque_fin = min(bloque_ini + BOLETOS_X_PLANILLA - 1, fin)
+                num_planilla = (i // BOLETOS_X_PLANILLA) + 1
 
-                buf = generar_pdf_planilla(
-                    sub_ids,
-                    archivo,
-                    session['usuario'],   # o quien corresponda
-                    fecha_p,
-                    page_start,
-                    page_end,
-                    SERIE_MAP
+                planilla_buf = generar_pdf_planilla(
+                    bloque_ids, archivo, 'SIN_NOMBRE',
+                    fecha_planilla, bloque_ini, bloque_fin,
+                    SERIE_MAP, num_planilla
                 )
-                merger.append(buf)
+                merger.append(planilla_buf)
 
-            # 3) Mando el PDF completo
-            salida = BytesIO()
-            merger.write(salida)
-            salida.seek(0)
-            return send_file(
-                salida,
-                download_name=f'planilla_{inicio}_a_{fin}.pdf',
-                as_attachment=True
-            )
+            out = BytesIO()
+            merger.write(out)
+            out.seek(0)
 
+            sorteos = cargar_sorteos()
+            activo = next((s for s in sorteos if s['estado'] == 'Activo'), None)
+            if activo:
+                if 'planillas' not in activo:
+                    activo['planillas'] = []
+                activo['planillas'].append({
+                    "vendedor": "SIN_NOMBRE",
+                    "archivo": archivo,
+                    "inicio": inicio,
+                    "fin": fin,
+                    "planillas": (fin - inicio + 1) // 30
+                })
+                guardar_sorteos(sorteos)
 
-        # ── ZIP (ambos) ────────────────────────────────────────
-        elif form_type == 'zip':
-            # ... tu código de ZIP sin tocarlo ...
-            pass
+            return send_file(out, download_name='planilla_vendedor.pdf', as_attachment=True)
 
-    # ─ GET / formulario ───────────────────────────────────────
     return render_template(
         'impresion_boletos_excel.html',
         series=series,
         reintegros=reintegros,
-        fecha_hoy=fecha_hoy,
-        usuario=session['usuario'],
-        rol=session['rol'],
-        avatar=session['avatar'],
-        permisos=session['permisos']
+        fecha_hoy=fecha_hoy
     )
+                 
+
+POSICIONES_FILE = os.path.join(DATA_DIR, "posiciones_boletos.json")
+
+@app.route('/editor_boletos', methods=['GET', 'POST'])
+def editor_boletos():
+    if request.method == 'POST':
+        # Recibir JSON del front-end y guardar en archivo
+        posiciones = request.get_json()
+        with open(POSICIONES_FILE, 'w', encoding='utf-8') as f:
+            json.dump(posiciones, f, indent=2)
+        return jsonify({"success": True, "msg": "Posiciones guardadas correctamente."})
+    return render_template('editor_boletos.html')    
 
 
-# ─── GENERAR PDF BOLETOS ─────────────────────────────────────
+
+
+
+
 def generar_pdf_boletos_excel(
-    ids, registros, valor, telefono,
-    nombre, reintegro_especial,
-    cant_especial, reintegros,
-    incluir_aleatorio, fecha_sorteo
+    ids,
+    registros,
+    valor,
+    telefono,
+    nombre,
+    reintegro_especial,
+    cant_especial,
+    reintegros,
+    incluir_aleatorio,
+    fecha_sorteo
 ):
-    buf    = BytesIO()
-    c      = canvas.Canvas(buf, pagesize=A4)
-    ancho, alto = A4
-    N = len(registros)
+    buf = BytesIO()
+    c   = canvas.Canvas(buf, pagesize=A4)
+    ancho_pg, alto_pg = A4
 
+    # Si me llega un DataFrame lo convierto
+    if hasattr(registros, "to_dict"):
+        registros = registros.to_dict("records")
+    elif registros and isinstance(registros[0], str):
+        registros = [{} for _ in registros]
+
+    N = len(registros)
     esp_idx = random.sample(range(N), min(N, cant_especial)) if reintegro_especial else []
     ale_idx = [i for i in range(N) if i not in esp_idx] if incluir_aleatorio else []
 
-    for start in range(0, N, FILAS*COLUMNAS):
-        page = registros[start:start+FILAS*COLUMNAS]
-        for i, row in enumerate(page):
+    # Tamaños
+    ancho_bol = (ancho_pg - 2*MARGEN_H - ESPACIO_H*(COLUMNAS-1)) / COLUMNAS
+    alto_bol  = (alto_pg  - 2*MARGEN_H - ESPACIO_V*(FILAS   -1)) / FILAS
+    size_celda = min(ancho_bol, alto_bol) * GRID_SCALE / 5
+
+    # Recorro páginas de 8 boletos
+    for start in range(0, N, COLUMNAS*FILAS):
+        # <<< APLICAR CALIBRACIÓN EN CADA PÁGINA >>>
+        c.saveState()
+        c.translate(CALIB_X, CALIB_Y)
+
+        chunk = registros[start:start + COLUMNAS*FILAS]
+        for i, row in enumerate(chunk):
             pos = start + i
             col = i % COLUMNAS
             fil = i // COLUMNAS
 
-            ancho_b = (ancho + 2*MARGEN_IZQ - ESPACIO_X*(COLUMNAS-1)) / COLUMNAS
-            alto_b  = (alto  + 2*MARGEN_SUP - ESPACIO_Y*(FILAS-1))   / FILAS
-            x0 = MARGEN_IZQ + col*(ancho_b + ESPACIO_X)
-            y0 = alto - MARGEN_SUP - fil*(alto_b + ESPACIO_Y)
-            if fil == 2: y0 -= DELTA_Y_FILA_3
-            if fil == 3: y0 -= DELTA_Y_FILA_4
+            x0 = MARGEN_H + col*(ancho_bol + ESPACIO_H)
+            y0 = alto_pg - MARGEN_H - fil*(alto_bol + ESPACIO_V)
+            cx, cy = x0 + ancho_bol/2, y0 - alto_bol/2
 
-            size = min(ancho_b, alto_b) / 5
-            offs = per_cell_offsets[i]
+            offs = per_cell_offsets.get(i, {})
 
-            # Dibujo rejilla 5×5 y QR
-            bx0 = x0 + ancho_b - size*5 + offs['grid_x']
-            by0 = y0 + offs['grid_y']
-            c.setFont('Helvetica-Bold', SIZE_NUM)
+            # 1) Rejilla 5×5 rotada
+            bb_w, bb_h = size_celda*5, size_celda*5
+            bx0 = cx - bb_w/2 + GRID_OFFSET_X + offs.get("grid_x", 0)
+            by0 = cy + bb_h/2 + GRID_OFFSET_Y + offs.get("grid_y", 0)
+
+            c.saveState()
+            c.translate(cx, cy)
+            c.rotate(CELL_ROT)
+            c.translate(-cx, -cy)
+            c.setFont("Helvetica-Bold", SIZE_NUM)
             for r in range(5):
-                for j, letra in enumerate('bingo'):
-                    cx = bx0 + j*size
-                    cy = by0 - r*size
-                    if letra == 'n' and r == 2:
+                for j, letra in enumerate("bingo"):
+                    x = bx0 + j*size_celda
+                    y = by0 - r*size_celda
+                    if letra=="n" and r==2:
                         qr = qrcode.make(f"{ids[pos]}|{fecha_sorteo}")
-                        buf_qr = BytesIO(); qr.save(buf_qr, 'PNG'); buf_qr.seek(0)
-                        c.drawImage(ImageReader(buf_qr), cx+2, cy+2, size-4, size-4)
+                        qr_buf = BytesIO(); qr.save(qr_buf,"PNG"); qr_buf.seek(0)
+                        c.drawImage(ImageReader(qr_buf), x+1, y+1, size_celda-2, size_celda-2)
                     else:
                         v = str(row.get(f"{letra}{r+1}", "-"))
-                        c.drawCentredString(cx + size/2, cy + size*0.28, v)
+                        c.drawCentredString(x + size_celda/2, y + size_celda*0.28, v)
+            c.restoreState()
 
-            # Línea de info
-            info = f"{ids[pos]}{SERIE_MAP.get(nombre,nombre)} | {fecha_sorteo} | ${valor} | {telefono}"
-            c.setFont('Helvetica', SIZE_INFO)
-            c.drawString(x0 + offs['info_x'], y0 - size*5 + offs['info_y'], info)
+            # 2) Info rotada (ID destacado + resto)
+            x_info = x0 + INFO_DX + offs.get("info_x", 0)
+            y_info = y0 - size_celda*5 + INFO_DY + offs.get("info_y", 0)
 
-            # Icono de reintegro
-            img = None
+            c.saveState()
+            c.translate(x_info, y_info)
+            c.rotate(INFO_ROT)
+            boleto_text = f"{ids[pos]}{SERIE_MAP.get(nombre, nombre)}"
+            c.setFont("Helvetica-Bold", SIZE_ID)
+            c.drawString(0, 0, boleto_text)
+            resto = f"  | {fecha_sorteo} | ${valor} | {telefono}"
+            c.setFont("Helvetica", SIZE_INFO)
+            dx = c.stringWidth(boleto_text, "Helvetica-Bold", SIZE_ID) + 5
+            c.drawString(dx, 0, resto)
+            c.restoreState()
+
+            # 3) Icono de reintegro rotado
+            ix = x0 + REINT_DX + offs.get("rein_x", 0)
+            iy = y0 + REINT_DY + offs.get("rein_y", 0)
             if pos in esp_idx and reintegro_especial:
-                img = reintegro_especial
+                img_name = reintegro_especial
             elif pos in ale_idx and reintegros:
                 others = [r for r in reintegros if r != reintegro_especial]
-                img = random.choice(others) if others else None
+                img_name = random.choice(others) if others else None
+            else:
+                img_name = None
+            if img_name:
+                ruta = os.path.join(REINTEGROS_DIR, img_name)
+                c.saveState()
+                c.translate(ix + REINT_W/2, iy + REINT_H/2)
+                c.rotate(REINT_ROT)
+                c.translate(-ix - REINT_W/2, -iy - REINT_H/2)
+                c.drawImage(ruta, ix, iy, REINT_W, REINT_H, mask="auto")
+                c.restoreState()
 
-            if img:
-                c.drawImage(
-                    ImageReader(os.path.join(REINTEGROS_DIR, img)),
-                    x0 + offs['rein_x'], y0 - offs['rein_y'],
-                    REINTEGRO_W, REINTEGRO_H,
-                    mask='auto'
-                )
-
+        # restaurar y pasar de página (showPage resetea transformaciones)
+        c.restoreState()
         c.showPage()
 
     c.save()
     buf.seek(0)
     return buf
+
+
 
 def generar_pdf_planilla(ids, serie_archivo, vendedor, fecha, inicio, fin, serie_map, num_planilla=None):
     from io import BytesIO
@@ -1085,6 +1038,7 @@ def not_found(e):
 # ─── RUN SERVER ─────────────────────────────────────────────
 if __name__ == '__main__':
     app.run(debug=True)
+
 
 
 
